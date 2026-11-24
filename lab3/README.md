@@ -3,7 +3,7 @@
 Асинхронне завантаження ассетів з екраном прогресу, обробкою помилок і повторами (`withRetry`), розв'язка через `EventTarget` та лобі по HTTP з `AbortController` і `AbortSignal.timeout`.
 
 **Запуск:** `npm install`, потім `npm install -D vite eslint @eslint/js globals prettier`, далі `npm run dev`.
-**Керування:** стрілки або `WASD`, `Space` - постріл, `H` — показати/сховати HUD.
+**Керування:** стрілки або `WASD`, `Space` - постріл, `H` - показати/сховати HUD.
 
 ## Структура
 
@@ -39,7 +39,7 @@
 | mode | what I expect | screenshot / log |
 |---|---|---|
 | `404-sound` | гра запускається, у консолі є попередження про відсутній необов'язковий звук | `GET /test/status/404 404 (Not Found)`, `[loader] concurrent: 24 ms`, попередження `optional assets missing: ['ghost']` |
-| `404-required` | екран помилки + кнопка повтору; без ретраїв, бо `404` — це помилка клієнта (`4xx`) | `GET /test/status/404 404 (Not Found)`, екран `Loading failed`, `click to retry`, `HttpError: HTTP 404 for /test/status/404` |
+| `404-required` | екран помилки + кнопка повтору; без ретраїв, бо `404` - це помилка клієнта (`4xx`) | `GET /test/status/404 404 (Not Found)`, екран `Loading failed`, `click to retry`, `HttpError: HTTP 404 for /test/status/404` |
 | `flaky` | дві помилки `503` повторюються з backoff + jitter, після чого завантаження успішно завершується | дві `503 (Service Unavailable)`, `[loader] concurrent: 676 ms`, успішний перехід до екрана лобі (`DOGFIGHT`) |
 | `timeout` | запит переривається по таймауту (`AbortSignal.timeout`), виконуються спроби повтору, далі екран помилки з повтором | екран `Loading failed`, `click to retry`, `TimeoutError: signal timed out` |
 | `abort` | скасування завантаження («Loading cancelled»), екран помилки з можливістю натиснути для повтору | екран `Loading cancelled`, `click to retry`, `AbortError: signal is aborted without reason` |
