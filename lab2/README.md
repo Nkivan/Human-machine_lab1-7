@@ -1,16 +1,13 @@
 # Dogfight — Lab 02: Objects, Prototypes, and this
 
-Controls: arrows/WASD, Space = fire, H = toggle HUD.
-Run: `npm install`, `npm install -D vite eslint @eslint/js globals prettier`, `npm run dev`.
+Симуляція бою сутностей на HTML5 Canvas: корабель, кулі, астероїди, пікапи та вибухи на базі `Map`, однорівневого наслідування (`Ship extends Entity`) і композиції поведінок.
 
-## The `this` bug
-- What I wrote: `canvas.addEventListener("click", ship.fire)`
-- What happened: `this` was `<canvas>` / `undefined`, and the Event was passed as `world` -> TypeError
-- Fix chosen: (arrow wrapper / bind / class-field arrow) because ...
-- Alternatives and downsides: arrow wrapper (new function per registration), bind (extra object, easy to forget), class-field arrow (one function per instance = memory).
-- Demo: `src/this-demo.js`
+## Керування та запуск
 
-## Why composition (<= 1 page)
-- Homing is ONE function (`behaviors.js`) attached to bullets and asteroids.
-- Inheritance version: Entity -> Moving -> Homing -> HomingBullet / HomingAsteroid, plus a Pickup that is neither moving nor a ship.
-- Why I chose behaviors-as-functions: ...
+- **Керування:** стрілки або `WASD` — рух і поворот, `Space` — постріл, `H` — показати/сховати HUD.
+- **Запуск:**
+  ```bash
+  npm install
+  npm install -D vite eslint @eslint/js globals prettier
+  npm run dev
+  Архітектура та сутності (M1–M3)src/sim/vector.js — Vector2 із чистими методами (add, sub, scale, length, normalize, rotate, dot, static fromAngle), які повертають нові вектори без мутації вихідного.   src/sim/entity.js — базовий клас Entity (id, pos, vel, angle, radius, alive, kind, update(dt)) і приватним статичним лічильником #id.   src/sim/ship.js — Ship extends Entity (один рівень наслідування), приватне #hp із публічним геттером hp, стрільба fire() від носа корабля з урахуванням швидкості судна, респаун через 2 с у безпечній точці.   src/sim/bullet.js, src/sim/asteroid.js, src/sim/pickup.js, src/sim/explosion.js — кулі з обмеженим часом життя (TTL), астероїди, нерухомі пікапи з колізією (щит / швидка стрільба) та частинки вибухів.   src/sim/world.js — менеджер сутностей на Map<id, Entity> з ітератором [Symbol.iterator], генератором *ofKind(kind) та відкладеним despawn(id) із зачисткою мертвих сутностей наприкінці кроку.   src/sim/collision.js — система колізій (circle–circle), що знаходить пари зіткнень для подальшої обробки шкоди, респауну та підрахунку score у HUD.   src/sim/behaviors.js — функції поведінок для композиції (зокрема логіка наведення homing).   The this bugWhat I wrote: canvas.addEventListener("click", ship.fire)What happened: при виклику через обробник події this всередині fire вказував на <canvas> (або undefined у strict mode/при відв'язаному виклику), а першим аргументом передавався об'єкт Event замість world, що призводило до TypeError.Fix chosen: обгортка-стрілка () => ship.fire(world) при реєстрації обробника, оскільки вона не створює окреме поле на кожному екземплярі класу, явно зберігає прив'язку до ship і дозволяє чітко передати потрібний аргумент world.Alternatives and downsides:Arrow wrapper (() => ship.fire(...)) — створює нову функцію на кожну реєстрацію слухача події..bind(ship) (ship.fire.bind(ship)) — повертає додаткову прив'язану функцію-обгортку, а при виклику легко забути передати або перевірити параметри.Class-field arrow (fire = () => { ... }) — створює окремий екземпляри функції на кожен об'єкт класу, що витрачає додаткову пам'ять при великій кількості екземплярів.Demo: src/this-demo.js   Why composition (<= 1 page)Спільна поведінка: логіка наведення (homing) реалізована як одна функція в src/sim/behaviors.js, яку можна підключати і до куль, і до астероїдів без дублювання коду[cite: 13].Як виглядала б ієрархія наслідування: довелося б будувати громіздке дерево на кшталт Entity -> MovingEntity -> HomingEntity -> HomingBullet / HomingAsteroid, і воно все одно ламалося б на нерухомому Pickup, який має колізію, але не є кораблем і не рухається як снаряд.Чому обрано поведінки-функції (композицію): поведінки залишаються незалежними, легко комбінуються між різними видами сутностей без роздування ієрархії класів, не вимагають глибоких ланцюжків extends і добре підходять для розвитку гри в наступних лабораторних.
