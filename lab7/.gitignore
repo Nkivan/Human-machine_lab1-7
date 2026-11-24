@@ -1,0 +1,8 @@
+node_modules
+dist
+server/logs
+*.tsbuildinfo
+perf/
+coverage
+playwright-report
+test-results
