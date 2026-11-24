@@ -1,0 +1,14 @@
+{
+  "name": "@dogfight/shared",
+  "private": true,
+  "version": "0.5.0",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "bench": "node tools/codec-bench.js",
+    "hash": "node tools/hash-sim.js"
+  }
+}
