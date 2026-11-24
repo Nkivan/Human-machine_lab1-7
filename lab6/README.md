@@ -11,4 +11,4 @@ npm run dev:client          # термінал 2 -> http://localhost:5173 (дв�
 npm run typecheck           # tsc --noEmit у кожному воркспейсі (Vite цього не виконує)
 npm run lint                # typescript-eslint: без `any`, без `!`, мінімум приведень `as`
 npm test                    # усі тести (shared, client, server)
-npm run build
+npm run build```
