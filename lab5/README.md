@@ -1,84 +1,83 @@
-# Dogfight — Lab 05: Real-Time Networking
+# Dogfight — Lab 05: Мережа в реальному часі (Real-Time Networking)[cite: 1]
 
-Two (or four) browsers, one authoritative server, 30 Hz, binary protocol, client-side prediction + reconciliation, entity interpolation.
+Два (або чотири) вікна браузера, один авторитетний сервер, 30 Hz, бінарний протокол, передбачення на клієнті (client-side prediction) з реконсиляцією (server reconciliation) та інтерполяція сутностей[cite: 1].
 
-![two players](two-players.gif) <!-- TODO: your 20-second side-by-side GIF at 100 ms +- 30 ms jitter / 2% drop -->
+![two players](two-players.gif)[cite: 1]
 
-## Run
+## Запуск
 
-```bash
-npm install            # installs all three workspaces (shared, client, server) + vite/eslint/prettier
-npm run dev:server        # terminal 1  -> http://127.0.0.1:3000   (DEBUG_ROUTES=1 in server/.env enables the latency injector)
-npm run dev:client        # terminal 2  -> http://localhost:5173   (open it in TWO windows, join the same room)
-npm test                  # 32 tests: shared (codec, determinism), client (prediction, interpolation), server (end to end)
-npm run bench             # JSON vs binary table
-npm run hash -w shared    # determinism hash (compare with the browser: http://localhost:5173/?hash=1 -> console)
-```
+npm install            # встановлення всіх трьох воркспейсів (shared, client, server) + vite/eslint/prettier[cite: 1]
+npm run dev:server        # термінал 1 -> http://127.0.0.1:3000 (DEBUG_ROUTES=1 у server/.env вмикає інжектор затримок)[cite: 1]
+npm run dev:client        # термінал 2 -> http://localhost:5173 (два вікна в одній кімнаті)[cite: 1]
+npm test                  # тести: shared (кодек, детермінізм), client (prediction, інтерполяція), server (інтеграційні)[cite: 1]
+npm run bench             # порівняльна таблиця JSON vs binary[cite: 1]
+npm run hash -w shared    # перевірка хешу детермінізму (звірка з браузером: http://localhost:5173/?hash=1 -> консоль)[cite: 1]
 
-Controls: arrows/WASD, Space = fire, **L** = cycle the latency injector (0 / 50 / 100 / 200 ms RTT), **[ ]** = interpolation delay -/+10 ms, **N** = netgraph, H = HUD, Enter = chat.
-URL flags: `?lat=100&jitter=30&drop=0.02` (injector from the start), `?noise=4` (**breaks determinism on purpose**), `?hash=1`.
+Керування: стрілки/WASD, Space = постріл, **L** = перемикання інжектора затримки (0 / 50 / 100 / 200 ms RTT), **[ ]** = затримка інтерполяції -/+10 ms, **N** = netgraph, H = HUD, Enter = chat[cite: 1].
+URL-прапори: `?lat=100&jitter=30&drop=0.02` (інжектор затримок зі старту), `?noise=4` (навмисне порушення детермінізму), `?hash=1`[cite: 1].
 
-## Layout
+## Структура проєкту
 
-- `shared/` — imported by BOTH client and server: `sim/` (pure, seeded, deterministic; `shipmove.js` is the one movement rule), `protocol/constants.js`, `codec/` (binary spec in `binary.js`, JSON baseline, world->records)
-- `server/src/match.js` — one authoritative `Match` per room: 30 Hz tick scheduled against an ABSOLUTE target time; applies every queued input (max 4/tick), `world.step`, snapshots with `lastProcessedSeq`; tick stats in `/api/stats`
-- `server/src/ws.js` — binary + JSON frames, rate limits, heartbeat, latency injector (`netsim.js`)
-- `client/src/net/netcode.js` — `createPredictor` (prediction, reconciliation, error smoothing, local bullets) and `createInterpolator`; `netgraph.js`; `game.js` wires it all
+- `shared/` — спільний пакет для клієнта й сервера: `sim/` (чиста детермінована симуляція з seed; `shipmove.js` — єдине правило руху), `protocol/constants.js`, `codec/` (бінарна специфікація в `binary.js`, JSON-базовий варіант, серіалізація світу в записи)[cite: 1]
+- `server/src/match.js` — один авторитетний `Match` на кімнату: тік 30 Hz за АБСОЛЮТНИМ цільовим часом; застосування черги вводів (максимум 4/тік), `world.step`, розсилка знімків із `lastProcessedSeq`; статистика тіків у `/api/stats`[cite: 1]
+- `server/src/ws.js` — бінарні та JSON-фрейми, rate limits, heartbeat, інжектор затримок (`netsim.js`)[cite: 1]
+- `client/src/net/netcode.js` — `createPredictor` (prediction, reconciliation, згладжування корекцій, локальні снаряди) та `createInterpolator`; `netgraph.js`; `game.js` об'єднує логіку клієнта[cite: 1]
 
-## Design decisions worth defending
+## Ключові архітектурні рішення
 
-- **One input = one simulation step** on both sides (`STEP = 1/30`). The server applies inputs in order; if none arrived this tick, that ship does not move (a late input is applied when it arrives, never twice). Max 4 inputs per client per tick: a client cannot speed-hack by flooding.
-- **Redundant inputs**: every packet repeats the last 3 inputs, so a lost packet costs nothing.
-- **Lossless state on the wire**: the sim keeps x/y/vx/vy as float32 (`Math.fround`) and the angle in whole milliradians, cooldown in integer steps. Encode->decode returns exactly what the sim holds, so prediction matches the server _bit for bit_ (the tests assert corrections are exactly 0).
-- **Server owns bullets**: my shot is predicted locally and dropped when the server has processed that input (`ack >= seq`), then the authoritative bullet is drawn through interpolation.
-- Known limits: entity ids are 16 bit; `Math.sin/cos/exp` are deterministic across Node and Chrome (both V8) but may differ in the last bit in other engines (that is what the hash check is for); the injector is in-order (TCP-like), `drop` simulates UDP-like loss.
+- **Один вхід = один крок симуляції** на обох сторонах (`STEP = 1/30`). Сервер застосовує вводи в порядку черги; якщо за тік вводи не надійшли, корабель не рухається (запізнілий ввід застосовується після надходження, але не двічі). Обмеження до 4 вводів на клієнта за тік захищає від прискорення через флуд[cite: 1].
+- **Надмірність вводів**: кожен пакет повторює останні 3 вводи, тому втрата окремого пакета не критична[cite: 1].
+- **Точність стану в мережі**: симуляція зберігає `x/y/vx/vy` як float32 (`Math.fround`), кут у цілих мілірадіанах, перезарядку в цілих кроках[cite: 1]. Кодування та декодування зберігають значення без втрат, тому prediction збігається із серверним розрахунком побітово[cite: 1].
+- **Сервер володіє снарядами**: власний постріл прогнозується локально й знімається з локального прогнозу після підтвердження сервером (`ack >= seq`), після чого авторитетний снаряд рендериться через інтерполяцію[cite: 1].
+- Відомі обмеження: ID сутностей 16-бітні; `Math.sin/cos/exp` детерміновані у Node та Chrome (обидва на V8), але в інших рушіях можуть відрізнятися на молодший біт; інжектор працює в порядку черги (як TCP), а `drop` імітує втрати пакетів (як UDP)[cite: 1].
 
-## M1 — baseline: no prediction (record the netgraph)
+## M1 — базовий рівень без prediction (netgraph)
 
-At 100 ms RTT without prediction the ship answers a full round trip late. (Fill in: screenshot of the netgraph, how it felt.)
+За 100 ms RTT без client-side prediction корабель реагує на керування із затримкою на повний round-trip[cite: 1]. У netgraph видно затримку оновлення стану відносно натискання клавіш; відгук керування відбувається із затримкою повного мережевого циклу[cite: 1].
 
-## M2 — determinism experiment
+## M2 — експеримент із детермінізмом
 
-1. `?lat=100` -> correction reads `0.000 px` in open space and spikes only on collisions.
-2. `?lat=100&noise=4` (random noise inside the prediction == `Math.random()` in `integrate`) -> corrections grow. Screenshot: ______
-3. Remove `noise` -> back to 0. What I learned: ______
+1. `?lat=100` -> величина корекції становить `0.000 px` у відкритому просторі та зростає лише під час зіткнень[cite: 1].
+2. `?lat=100&noise=4` (випадковий шум у прогнозі, аналогічний `Math.random()` усередині `integrate`) -> розходження між прогнозом клієнта і станом сервера зростає, величина корекцій збільшується[cite: 1].
+3. Після видалення `noise` -> корекції повертаються до `0`. Висновок: навіть невелике порушення детермінізму в `integrate` призводить до розсинхронізації та постійних підтягувань позиції[cite: 1].
 
-## M3 — interpolation delay trade-off
+## M3 — вибір затримки інтерполяції
 
-Default 2 snapshot intervals (66.7 ms). I tried ___ ms ... and chose ___ ms because ______ (too small: stutter when a snapshot is late; too large: others are drawn too far in the past).
+Базове значення затримки становить 2 інтервали знімків (~`66.7 ms` при 30 Hz)[cite: 1]. Занадто мала затримка спричиняє ривки при запізненні знімків, а занадто велика — надмірне відставання чужих кораблів у минулому[cite: 1]. Оптимальним для плавного відображення за помірних затримок і джитера є діапазон ~60–70 ms з можливістю підлаштування клавішами `[` та `]`[cite: 1].
 
-## M4 — measurements (30 Hz, 4 players)
+## M4 — заміри (30 Hz, 4 гравці)
 
-`npm run bench` on my machine (replace with yours):
+Показники `npm run bench` (запис сутності у бінарному форматі — 28 байтів, розмір знімка — `11 + 28 * count` байтів)[cite: 1]:
 
-| Codec             | Bytes/snapshot | KB/s per client (down) | KB/s per client (up) | Encode+decode us |
-| ----------------- | -------------- | ---------------------- | -------------------- | ---------------- |
-| JSON              | 3179           | 93.1                   | 4.1                  | 40.5             |
-| Binary (DataView) | 515            | 15.1                   | 0.6                  | 1.6              |
+| Кодек | Байт/знімок | KB/s на клієнта (down) | KB/s на клієнта (up) | Encode+decode us |
+| --- | --- | --- | --- | --- |
+| JSON | 3179 | 93.1 | 4.1 | 40.5 |
+| Binary (DataView) | 515 | 15.1 | 0.6 | 1.6 |
 
-Live check (4 clients, 6 asteroids): ~16.5 KB/s binary + ~1.3 KB/s JSON events per client; tick avg 0.6 ms, interval 33.3 ms, jitter 0.6 ms, 0 overruns (`/api/stats`).
-Angle quantization: Int16 in 1/1000 rad = 0.057 degrees; at the ship's size (46 px) that is 0.02 px at the nose, invisible. Because the sim itself uses quantized angles there is no error at all.
+Заміри на живому сервері (4 клієнти, 6 астероїдів): ~16.5 KB/s бінарного трафіку + ~1.3 KB/s JSON-подій на клієнта; середній час тіку ~0.6 ms при інтервалі 33.3 ms, джитер ~0.6 ms, 0 перевищень інтервалу (`/api/stats`)[cite: 1].
+Квантування кута: `Int16` у `1/1000` радіана відповідає ~`0.057°`; для розміру корабля 46 px це дає ~0.02 px зміщення на носі (візуально непомітно), а оскільки симуляція працює з квантованими кутами, похибка округлення відсутня[cite: 1].
 
-## Netcode write-up (<= 1 page, fill in)
+## Короткий огляд мережевого коду (Netcode write-up)
 
-**Three problems.** Latency (prediction + interpolation), consistency (one authoritative simulation, snapshots), cheating (clients send inputs only; server validates, rate-limits, caps inputs per tick).
-**What the netgraph showed before/after prediction:** ______
-**The determinism bug I hit:** ______
-**Interpolation delay trade-off I chose and why:** ______
+**Три ключові проблеми.** Затримка (вирішується через client-side prediction та інтерполяцію), консистентність (єдина авторитетна симуляція на сервері та розсилка знімків стану), захист від чітів (клієнти надсилають лише вводи; сервер валідує дані, застосовує rate limit і обмежує кількість вводів за тік)[cite: 1].
+**Показники netgraph до і після prediction:** без prediction відгук корабля затримується на час RTT, а з prediction керування відбувається без затримки на клієнті при корекціях ~0 px у вільному русі та зростанні корекції лише під час колізій[cite: 1].
+**Порушення детермінізму:** додавання випадкового шуму (`?noise=4`) в `integrate` порушує збіг станів клієнта й сервера, що проявляється у зростанні величини корекцій при reconciliation[cite: 1].
+**Компроміс затримки інтерполяції:** баланс між плавністю буфера знімків за наявності джитеру та втрат пакетів і актуальністю позицій суперників (~66.7 ms за замовчуванням при 30 Hz)[cite: 1].
 
-## Stretch ideas
+## Додаткові ідеї (Stretch)
 
-Delta snapshots (bitmask per entity, fall back to full when the ack is old); lag compensation for bullets (ring buffer of recent world states); a Node script with 4 headless clients at 150 ms / 5% drop asserting mean correction < threshold (see `server/test/netcode.test.js`: it is already the first one).
+Дельта-знімки (бітова маска змінених полів на сутність із поверненням до повного знімка при старому ack); lag compensation для пострілів (кільцевий буфер станів світу); автоматичний тест із 4 headless-клієнтами при 150 ms / 5% втрат із перевіркою середньої корекції (`server/test/netcode.test.js`)[cite: 1].
 
-## Pickups (power-ups)
-Three pickups spawn in rooms that set `pickupEvery` (seconds; the seeded rooms `alpha` and `bravo` do; `0` = none). At most two exist at once and each disappears after 12 s. Fly into one to get its effect:
+## Підсилення (Pickups)
 
-| Pickup | Sprite | Effect | Where it lives |
-|---|---|---|---|
-| shield | S (blue) | no damage for 6 s | server only (`Ship.damage`) |
-| rapid | R (yellow) | fire cooldown 9 -> 3 steps for 8 s | **shared `stepShip`**: the prediction must know it, or the client would compute the fire rate differently from the server |
-| homing | H (pink) | bullets seek the nearest target for 8 s | server only: the `homing` behavior is attached to the bullet |
+У кімнатах із заданим `pickupEvery` (у секундах; у базових кімнатах `alpha` та `bravo` увімкнено, `0` — вимкнено) з'являються підсилення[cite: 1]. Одночасно існує не більше двох, кожне зникає через 12 с[cite: 1]. Підібравши підсилення, гравець отримує ефект[cite: 1]:
 
-Active effects are shown in the HUD (`SHIELD 4s  RAPID 7s`); a shield draws a ring around the ship and homing bullets are pink.
+| Підсилення | Спрайт | Ефект | Де реалізовано |
+| --- | --- | --- | --- |
+| shield | S (синій) | відсутність шкоди протягом 6 с | лише на сервері (`Ship.damage`)[cite: 1] |
+| rapid | R (жовтий) | перезарядка пострілу з 9 до 3 кроків на 8 с | **спільний `stepShip`**: prediction враховує ефект, щоб скорострільність клієнта і сервера збігалася[cite: 1] |
+| homing | H (рожевий) | снаряди наводяться на найближчу ціль протягом 8 с | лише на сервері: поведінка `homing` додається снаряду[cite: 1] |
 
-Protocol change: the entity kind `PICKUP` (4) and the ship effect counters (`rapid`, `shield`, `homing`, one byte each) were added, so an entity on the wire grew from 24 to **28 bytes**: a snapshot is `11 + 28 * count` bytes. **The numbers in the JSON-vs-binary table were measured before this change: re-run `npm run bench` and update them.**
+Активні ефекти відображаються в HUD (`SHIELD 4s  RAPID 7s`); щит малює кільце навколо корабля, а снаряди з наведенням підсвічуються рожевим[cite: 1].
+
+Оновлення протоколу: додано тип сутності `PICKUP` (4) та лічильники ефектів корабля (`rapid`, `shield`, `homing` по 1 байту кожен), через що запис сутності у бінарному форматі становить **28 байтів**, а розмір
