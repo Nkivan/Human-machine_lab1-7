@@ -9,7 +9,7 @@ npm run dev:client        # термінал 2: http://localhost:5173 (Vite пр
 
 ## Запуск (продакшн-режим)
 npm run build && npm start      # Node віддає client/dist на :3000
-npm test                        # node:test — протокол, rate limit, кімнати, інтеграція WebSocket, HTTP-захисти
+npm test                        # node:test - протокол, rate limit, кімнати, інтеграція WebSocket, HTTP-захисти
 
 ## Структура проєкту
 server/src/app.js - сервер на node:http: статика (MIME + захист від path traversal), GET /health, GET/POST /api/rooms, GET /api/stats, GET /api/replays[/:id], debug-маршрути
