@@ -1,6 +1,6 @@
 # Dogfight — Lab 05: Мережа в реальному часі (Real-Time Networking)[cite: 1]
 
-Два (або чотири) вікна браузера, один авторитетний сервер, 30 Hz, бінарний протокол, передбачення на клієнті (client-side prediction) з реконсиляцією (server reconciliation) та інтерполяція сутностей[cite: 1].
+Два вікна браузера, один авторитетний сервер, 30 Hz, бінарний протокол, передбачення на клієнті (client-side prediction) з реконсиляцією (server reconciliation) та інтерполяція сутностей[cite: 1].
 
 ![two players](two-players.gif)[cite: 1]
 
