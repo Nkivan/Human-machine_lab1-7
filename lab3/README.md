@@ -3,15 +3,15 @@
 Асинхронне завантаження ассетів з екраном прогресу, обробкою помилок і повторами (`withRetry`), розв'язка через `EventTarget` та лобі по HTTP з `AbortController` і `AbortSignal.timeout`.
 
 **Запуск:** `npm install`, потім `npm install -D vite eslint @eslint/js globals prettier`, далі `npm run dev`.
-**Керування:** стрілки або `WASD`, `Space` — постріл, `H` — показати/сховати HUD.
+**Керування:** стрілки або `WASD`, `Space` - постріл, `H` — показати/сховати HUD.
 
 ## Структура
 
-- `public/assets/manifest.json` — опис спрайтів, кадрів, звуків (опціональних) та конфігурації арени
-- `src/assets/loader.js` — `fetchJson` (перевірка `res.ok`), `loadImage`, `loadAudio`, `loadJson`, `withRetry` (експоненційний backoff + jitter, без ретраїв на `4xx`), `loadAll` (`Promise.all` + лічильник прогресу)
-- `src/assets/loadingScreen.js` — прогрес-бар на canvas та екран помилки з повтором по кліку
-- `src/audio.js`, `src/hud.js` — підписники на події світу (`fired`, `hit`, `exploded`, `score`); `src/sim/` не імпортує жоден із них
-- `src/lobby.js` (`EventTarget`, дані) + `src/lobbyView.js` (DOM) — періодичне оновлення, `AbortSignal.timeout`, скасування запиту при виході з лобі
+- `public/assets/manifest.json` - опис спрайтів, кадрів, звуків (опціональних) та конфігурації арени
+- `src/assets/loader.js` - `fetchJson` (перевірка `res.ok`), `loadImage`, `loadAudio`, `loadJson`, `withRetry` (експоненційний backoff + jitter, без ретраїв на `4xx`), `loadAll` (`Promise.all` + лічильник прогресу)
+- `src/assets/loadingScreen.js` - прогрес-бар на canvas та екран помилки з повтором по кліку
+- `src/audio.js`, `src/hud.js` - підписники на події світу (`fired`, `hit`, `exploded`, `score`); `src/sim/` не імпортує жоден із них
+- `src/lobby.js` (`EventTarget`, дані) + `src/lobbyView.js` (DOM) - періодичне оновлення, `AbortSignal.timeout`, скасування запиту при виході з лобі
 
 ## Тестові режими (лише dev-сервер)
 
@@ -24,7 +24,7 @@
 | concurrent (`?test=slow`) | `3031 ms` |
 | sequential (`?test=slow&seq=1`) | `9079 ms` |
 
-**Why:** `Promise.all` запускає всі запити одночасно, тому загальний час визначається найдовшим запитом (~3 с)[cite: 9]. При послідовному завантаженні (`&seq=1`) кожен наступний запит стартує лише після завершення попереднього, тому час сумується (~9 с)[cite: 10].
+**Why:** `Promise.all` запускає всі запити одночасно, тому загальний час визначається найдовшим запитом (~3 с). При послідовному завантаженні (`&seq=1`) кожен наступний запит стартує лише після завершення попереднього, тому час сумується (~9 с).
 
 ## M4a — ordering puzzles (перевірені в консолі)
 
@@ -39,8 +39,8 @@
 | mode | what I expect | screenshot / log |
 |---|---|---|
 | `404-sound` | гра запускається, у консолі є попередження про відсутній необов'язковий звук | `GET /test/status/404 404 (Not Found)`, `[loader] concurrent: 24 ms`, попередження `optional assets missing: ['ghost']` |
-| `404-required` | екран помилки + кнопка повтору; без ретраїв, бо `404` — це помилка клієнта (`4xx`) | `GET /test/status/404 404 (Not Found)`, екран `Loading failed`, `click to retry`, `HttpError: HTTP 404 for /test/status/404`[cite: 11] |
-| `flaky` | дві помилки `503` повторюються з backoff + jitter, після чого завантаження успішно завершується | дві `503 (Service Unavailable)`, `[loader] concurrent: 676 ms`, успішний перехід до екрана лобі (`DOGFIGHT`)[cite: 12] |
-| `timeout` | запит переривається по таймауту (`AbortSignal.timeout`), виконуються спроби повтору, далі екран помилки з повтором | екран `Loading failed`, `click to retry`, `TimeoutError: signal timed out`[cite: 13] |
-| `abort` | скасування завантаження («Loading cancelled»), екран помилки з можливістю натиснути для повтору | екран `Loading cancelled`, `click to retry`, `AbortError: signal is aborted without reason`[cite: 14] |
-| `corrupt` | помилка парсингу (`SyntaxError`), екран помилки з повтором без безглуздих ретраїв битого файлу | екран `Loading failed`, `click to retry`, `SyntaxError: Expected property name or '}' in JSON...`[cite: 15] |
+| `404-required` | екран помилки + кнопка повтору; без ретраїв, бо `404` — це помилка клієнта (`4xx`) | `GET /test/status/404 404 (Not Found)`, екран `Loading failed`, `click to retry`, `HttpError: HTTP 404 for /test/status/404` |
+| `flaky` | дві помилки `503` повторюються з backoff + jitter, після чого завантаження успішно завершується | дві `503 (Service Unavailable)`, `[loader] concurrent: 676 ms`, успішний перехід до екрана лобі (`DOGFIGHT`) |
+| `timeout` | запит переривається по таймауту (`AbortSignal.timeout`), виконуються спроби повтору, далі екран помилки з повтором | екран `Loading failed`, `click to retry`, `TimeoutError: signal timed out` |
+| `abort` | скасування завантаження («Loading cancelled»), екран помилки з можливістю натиснути для повтору | екран `Loading cancelled`, `click to retry`, `AbortError: signal is aborted without reason` |
+| `corrupt` | помилка парсингу (`SyntaxError`), екран помилки з повтором без безглуздих ретраїв битого файлу | екран `Loading failed`, `click to retry`, `SyntaxError: Expected property name or '}' in JSON...` |
