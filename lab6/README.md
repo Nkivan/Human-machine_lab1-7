@@ -1,68 +1,115 @@
-Dogfight — Lab 06: TypeScript
-The whole codebase (shared, server, client) is TypeScript under strict + noUncheckedIndexedAccess, with one typed protocol and validation at every boundary. The runtime behaviour is unchanged: the Lab 5 determinism hash is identical (e34f5d00) and a test asserts it.
+# Dogfight — Лабораторна робота №06: TypeScript
 
-Run
-npm install                 # Node 22 recommended; Node >= 20.6 works (the server runs through tsx)
-npm run dev:server          # terminal 1  -> http://127.0.0.1:3000
-npm run dev:client          # terminal 2  -> http://localhost:5173  (open in TWO windows, join the same room)
-npm run typecheck           # tsc --noEmit in every workspace (this is what Vite does NOT do)
-npm run lint                # typescript-eslint: no `any`, no non-null `!`, no `as` casts
-npm test                    # all tests (shared, client, server)
-npm run build
-Native TypeScript on Node >= 22.18 (or 22.6+ with the flag), no tsx at all: npm run start:native -w server. Controls and URL flags are unchanged from Lab 5 (?lat=100&jitter=30&drop=0.02, ?noise=4, ?hash=1, plus ?codec=json for the JSON snapshot codec).
+Уся кодова база (`shared`, `server`, `client`) переведена на TypeScript у суворому режимі (`strict` + `noUncheckedIndexedAccess` + `verbatimModuleSyntax` + `erasableSyntaxOnly`) з єдиним типізованим протоколом і валідацією даних на всіх межах. Поведінка під час виконання (runtime) залишилася незмінною: хеш детермінізму з Лабораторної №05 ідентичний (`e34f5d00`), що підтверджується автоматичним тестом.
 
-CI: .github/workflows/ci.yml runs npm ci && typecheck && lint && test && build. Commit the package-lock.json that npm install creates on your machine, because npm ci needs it.
+## Запуск та перевірка
 
-What changed (and why)
-Where	What
-tsconfig.base.json	strict, noUncheckedIndexedAccess, noImplicitOverride, verbatimModuleSyntax, erasableSyntaxOnly (no enum, no parameter properties: Node can strip the types natively), noUnused*
-shared/	compiles with no DOM and no Node types: that alone proves the sim is platform-free. Vector2 has readonly x, y; EntityId/Tick/Seq are branded; Ship | Bullet | Asteroid is a discriminated union on kind
-shared/src/protocol/messages.ts	single source of truth: zod schema -> inferred type -> runtime parser, for every JSON message both ways, snapshot records and the HTTP API. parseClientMessage(data: unknown): Result<ClientMessage> never throws. Lab 4's hand-written validator is gone
-shared/src/codec/	binary decoder returns Result, never throws; first byte carries the protocol version (high nibble) so a stale client is rejected; Codec interface with a binary and a JSON implementation
-shared/src/bus.ts	typed Bus<E>: replaces EventTarget + CustomEvent (untyped detail) in the sim, audio, HUD and lobby
-server/src/config.ts	environment parsed by a zod schema (defaults, coercion, fail fast on bad values)
-server/src/rooms.ts	Room extends EventEmitter<RoomEvents> (Node's generic emitter): listener argument types are checked
-client/	Vite compiles .ts but does not check it; npm run typecheck does. manifest.json, /api/rooms, WebSocket text frames and binary frames are all validated before use
-Rules I enforce mechanically (ESLint): zero any, no x!, and 3 as casts in the whole repo, all in shared/src/protocol/ids.ts (the brand constructors: a brand exists only in the type system, so there is nothing to check at runtime).
+```bash
+npm install                 # Рекомендовано Node 22; працює на Node >= 20.6 (сервер запускається через tsx)
+npm run dev:server          # Термінал 1 -> [http://127.0.0.1:3000](http://127.0.0.1:3000)
+npm run dev:client          # Термінал 2 -> http://localhost:5173 (відкрити у ДВОХ вікнах і зайти в одну кімнату)
+npm run typecheck           # tsc --noEmit у кожному воркспейсі (Vite не виконує перевірку типів)
+npm run lint                # typescript-eslint: заборонено any, non-null ! та зайві as-касти
+npm test                    # Усі тести (shared, client, server)
+npm run build               # Збірка клієнта через Vite
+npm run bench               # Бенчмарк JSON (Zod) проти Binary (DataView)
+```
 
-What TypeScript found
-Concrete things the compiler made explicit during the migration (add the ones you hit yourself; each of these is in the code):
+Запуск сервера нативним TypeScript без `tsx` (Node >= 22.18 або 22.6+ із прапорцем): `npm run start:native -w server`.  
+Керування та URL-прапорці збережені з Лабораторної №05 (`?lat=100&jitter=30&drop=0.02`, `?noise=4`, `?hash=1`, а також **`?codec=json`** для перемикання на JSON-кодек).
 
-Unchecked indexing (noUncheckedIndexedAccess): list[i] in the collision loop, pending[0], snaps[i], particles[i], PRESETS[preset], assets.images["sheet"] are all T | undefined. The JavaScript assumed the index was valid; now every one has a guard or an explicit decision.
-A nullable that was never handled: a loaded asset is ImageBitmap | null (optional assets resolve to null when they fail). startNetGame now throws a clear error if the sprite sheet is missing instead of passing null to drawImage.
-Untyped event payloads: CustomEvent.detail is any. A misspelled detail.shipid would have been undefined at runtime. With Bus<WorldEvents> the name decides the payload type, and a typo does not compile.
-An ad-hoc property on a foreign object: Lab 5 stored socket.missed on the ws socket; TypeScript refused, so it became a WeakMap<WebSocket, number>.
-turn: number where only -1, 0, 1 are valid: now -1 | 0 | 1, the binary decoder narrows it with !== checks, and a cheating turn: 100 cannot even be represented after decoding. The client builds it with left === right ? 0 : right ? 1 : -1 instead of arithmetic that yields number.
-Magic numbers in three places: the entity kind (1/2/3), the flag bits and the aux packing were repeated in the encoder, decoder and renderer. They now live in one place (the codec); everything else sees { kind: "ship", hp, cooldown, thrust... }.
-Runtime/compile-time mismatch in my own test: typeof window does not compile in shared (no DOM types) — the right check is "window" in globalThis.
-Three types worth explaining (drafts: put them in your own words)
-1. A discriminated union and an exhaustive switch (EntityRecord in messages.ts, used in codec/binary.ts, netdraw.ts): ShipRecord | BulletRecord | AsteroidRecord, each with a literal kind. Checking r.kind tells the compiler which fields exist (r.hp only on ships). Every switch ends with default: return assertNever(r): if someone adds a fourth entity kind, every switch that forgot it stops compiling.
+CI (`.github/workflows/ci.yml`) автоматично виконує `npm ci && npm run typecheck && npm run lint && npm test && npm run build`.
 
-2. The typed event bus (shared/src/bus.ts): on<K extends keyof E>(name: K, fn: (payload: E[K]) => void). K is "whichever event name you pass", and E[K] is "the payload type for exactly that name". So bus.on("score", p => p.delta) knows p.delta is a number, and bus.emit("hit", { x: 1 }) is an error (missing y).
+---
 
-3. Branded ids (protocol/ids.ts): type Seq = number & { readonly [brand]: "Seq" }. At runtime it is just a number, but asSeq(5) is the only way to make one, so passing a Tick where a Seq is expected is a compile error. The brand is erased: zero cost.
+## Що змінилося (та чому)
 
-Framework decision (fill in)
-I did / did not rebuild the lobby and HUD in a framework. ______ (If not: the canvas and the game loop stay vanilla either way; the lobby is ~80 lines of typed DOM code (el() helper, Bus events), so a framework would add a build/runtime dependency larger than the code it replaces. If yes: what it gave you that EventTarget + DOM did not, and what it cost in bundle size and build complexity.)
+| Модуль / Файл | Зміни та архітектурне обґрунтування |
+|---|---|
+| `tsconfig.base.json` | Увімкнено `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `verbatimModuleSyntax`, `erasableSyntaxOnly` (без `enum` та parameter properties для підтримки нативного Type Stripping у Node.js), `noUnused*`. |
+| `shared/` | Компілюється без типів DOM і Node (`"types": []`), що гарантує незалежність симуляції від середовища виконання. `Vector2` має `readonly x, y`; `EntityId`, `Tick`, `Seq` — брендовані типи; `Ship \| Bullet \| Asteroid \| Pickup` — розмічене об'єднання (discriminated union) за полем `kind`. |
+| `shared/src/protocol/messages.ts` | Єдине джерело істини: Zod-схеми -> виведені TS-типи -> парсери часу виконання для всіх JSON-повідомлень в обидва боки, знімків стану та HTTP API. `parseClientMessage(data: unknown): Result` ніколи не кидає винятків; ручний валідатор із Лабораторної №04 видалено. |
+| `shared/src/codec/` | Бінарний декодер повертає `Result` без винятків; старший напівбайт першого байта містить версію протоколу (`PROTOCOL_VERSION = 2`) для відсіювання застарілих клієнтів; реалізовано інтерфейс `Codec` із бінарною та JSON-реалізаціями. |
+| `shared/src/bus.ts` | Типізована шина подій `Bus<E>` замінила `EventTarget + CustomEvent` (де `detail` мав тип `any`) у симуляції, аудіомодулі, HUD та лобі. |
+| `server/src/config.ts` | Змінні середовища валідуються через Zod-схему зі значеннями за замовчуванням, приведенням типів і миттєвою зупинкою при некоректній конфігурації. |
+| `server/src/rooms.ts` | `Room` наслідує узагальнений `EventEmitter<RoomEvents>` у Node.js, завдяки чому типи аргументів слухачів перевіряються на етапі компіляції. |
+| `client/` | Усі зовнішні дані (`manifest.json`, `/api/rooms`, текстові та бінарні WebSocket-фрейми) типізуються як `unknown` і проходять валідацію перед використанням. |
 
-Measurements
-npm run bench (30 Hz, 4 players; the JSON column now includes zod validation, so it is slower than in Lab 5):
+**Механічні обмеження (ESLint):** у всьому репозиторії **0** використань `any`, **0** операторів `!` (non-null assertion) і лише **3** приведення `as` — усі три зосереджені в `shared/src/protocol/ids.ts` у функціях-конструкторах брендованих типів (`asEntityId`, `asTick`, `asSeq`), оскільки бренд існує лише на рівні системи типів.
 
-Codec	Bytes/snapshot	KB/s per client (down)	KB/s per client (up)	Snapshot enc+dec us
-JSON (validated by zod)	3522	103.2	4.1	67.0
-Binary (DataView)	515	15.1	0.6	8.6
-(numbers from my machine: re-run on yours.) typecheck time before/after project references is the Stretch task.
+---
 
-Pickups (power-ups)
-Three pickups spawn in rooms that set pickupEvery (seconds; the seeded rooms alpha and bravo do; 0 = none). At most two exist at once and each disappears after 12 s. Fly into one to get its effect:
+## Що виявив TypeScript під час міграції (What TypeScript found)
 
-Pickup	Sprite letter	Effect	Where it lives
-shield	S (blue)	no damage for 6 s	server only (Ship.damage)
-rapid	R (yellow)	fire cooldown 9 -> 3 steps for 8 s	shared stepShip: the prediction must know it, or the client would compute the fire rate differently from the server
-homing	H (pink)	bullets seek the nearest target for 8 s	server only: the homing behavior is attached to the bullet
-Active effects are shown in the HUD (SHIELD 4s  RAPID 7s) and a shield draws a ring around the ship. Homing bullets are drawn pink.
+1. **Небезпечна індексація масивів та словників (`noUncheckedIndexedAccess`)**: звернення `list[i]` у циклі колізій, `pending[0]`, `snaps[i]`, `particles[i]`, `PRESETS[preset]`, `assets.images["sheet"]` тепер мають тип `T | undefined`. Там, де JS мовчки припускав існування елемента, додано явні перевірки.
+2. **Необроблений `null` під час завантаження ресурсів**: завантажене зображення має тип `ImageBitmap | null` (опціональні асети повертають `null` при помилці). У `startNetGame` додано явну перевірку та зрозумілу помилку при відсутності спрайт-листа замість передачі `null` у `drawImage`.
+3. **Нетипізовані корисні навантаження подій (`CustomEvent`)**: раніше `CustomEvent.detail` мав тип `any`, і помилка в імені поля (наприклад, `detail.shipid`) виявлялася лише в runtime як `undefined`. Із `Bus<E>` ім'я події жорстко визначає тип об'єкта `payload`.
+4. **Довільні властивості на сторонніх об'єктах**: у Лабораторній №05 лічильник пропущених пінгів зберігався як `socket.missed` безпосередньо на об'єкті WebSocket. TypeScript заборонив розширення стороннього типу, тому стан перенесено в `WeakMap<WebSocket, number>`.
+5. **Звуження діапазону керування поворотом (`turn`)**: замість загального `number` використано літеральний тип `-1 | 0 | 1`. Бінарний декодер звужує значення через перевірки `!==`, а клієнт обчислює напрямок виразом `left === right ? 0 : right ? 1 : -1`, виключаючи некоректні значення на кшталт `turn: 100`.
+6. **Дублювання «магічних чисел» протоколу**: коди типів сутностей (`1..4`), бітові прапорці та пакування поля `aux` раніше повторювалися в енкодері, декодері та рендерері. Тепер вони інкапсульовані в `codec/binary.ts`, а решта коду працює з типізованими полями (`{ kind: "ship", hp, cooldown, thrust, rapid, shield, homing }`).
+7. **Конфлікт типів середовища в `shared/`**: перевірка `typeof window` у спільному пакеті не скомпілювалася через відсутність DOM-типів — замінено на середовищно-незалежну перевірку `"window" in globalThis`.
 
-What changed in the protocol (and why the types helped): the entity kind pickup and the new ship fields (rapid, shield, homing) made every switch over EntityRecord / AnyEntity stop compiling until it handled them (the assertNever default), including the binary writer and reader. An entity on the wire grew from 24 to 28 bytes (three effect counters of one byte each + one reserved byte), so a snapshot is 11 + 28 * count bytes. The bench numbers in "Measurements" were taken before this change: re-run npm run bench and update the table.
+---
 
-Effect timers are integers in steps (1 step = 1/30 s) so they fit in one byte and stay exact on both sides.
-ось read me який в мене 
+## Три найцікавіші типи в проєкті
+
+1. **Розмічене об'єднання та вичерпний `switch` (`EntityRecord` у `shared/src/protocol/messages.ts`)**  
+   Тип `EntityRecord` об'єднує чотири варіанти сутностей: `ShipRecord | BulletRecord | AsteroidRecord | PickupRecord`, кожен із яких має унікальне літеральне поле `kind` (`"ship"`, `"bullet"`, `"asteroid"`, `"pickup"`). Перевірка `switch (e.kind)` автоматично звужує тип у кожній гілці (наприклад, `e.hp` чи `e.shield` доступні лише для `"ship"`, а `e.pickupType` — лише для `"pickup"`). Кожен `switch` завершується гілкою `default: return assertNever(e)`, що гарантує помилку компіляції при додаванні нового типу сутності без оновлення всіх обробників.
+
+2. **Узагальнена типізована шина подій (`Bus<E>` у `shared/src/bus.ts`)**  
+   ```ts
+   on<K E extends keyof>(name: K, fn: (payload: E[K]) => void): () => void
+   emit<K E extends keyof>(name: K, payload: E[K]): void
+   ```
+   Параметр типу `K extends keyof E` обмежує назву події ключами інтерфейсу подій (наприклад, `LobbyEvents` або `GameEvents`), а індексований доступ `E[K]` автоматично підставляє відповідний тип аргументу для цієї події. Завдяки цьому компілятор одразу підказує поля `payload` у колбеку `on()` і не дозволяє викликати `emit()` із неповним або неправильним об'єктом даних.
+
+3. **Брендовані типи (`Brand<T, B>` у `shared/src/protocol/ids.ts`)**  
+   ```ts
+   declare const brand: unique symbol;
+   export type Brand<T, B extends string> = T & { readonly [brand]: B };
+   export type EntityId = Brand<number, "EntityId">;
+   export type Tick = Brand<number, "Tick">;
+   export type Seq = Brand<number, "Seq">;
+   ```
+   У звичайному JS/TS ідентифікатор сутності, номер тіку та порядковий номер вводу є числами (`number`), тому їх легко випадково переплутати місцями у виклику функції. Брендування додає віртуальну властивість із `unique symbol`, яка повністю стирається після компіляції (нульові витрати в runtime), але на етапі перевірки типів забороняє передати `Tick` туди, де очікується `Seq` або `EntityId`.
+
+---
+
+## Рішення щодо UI-фреймворку (M4)
+
+Лобі, чат та HUD реалізовані **без використання зовнішнього UI-фреймворку** (React/Vue/Svelte) — на чистому типізованому DOM API за допомогою власної утиліти `el<K extends keyof HTMLElementTagNameMap>()` (`client/src/dom.ts`) та типізованої шини подій `Bus<LobbyEvents>` (`client/src/lobby.ts`, `client/src/lobbyView.ts`, `client/src/hud.ts`).
+
+**Обґрунтування:**
+* Ігровий `canvas` та цикл рендерингу (`loop.ts`, `draw.ts`) у будь-якому разі залишаються ванільними для збереження продуктивності та контролю кадрів.
+* Весь інтерфейс лобі й HUD займає близько 80–120 рядків прозорого типізованого коду, де стан відокремлено від рендерингу через `Lobby` + `Bus`.
+* Підключення фреймворку додало б рантайм-залежність і ускладнило б конфігурацію збірки/тестів сильніше, ніж обсяг коду, який воно замінює.
+
+---
+
+## Вимірювання продуктивності протоколу (`npm run bench`)
+
+Умови тесту: 4 гравці, частота 30 Гц, після додавання підсилень (`pickup`) та розширення бінарного запису сутності з 24 до 28 байтів (`11 + 28 * count` байтів на знімок):
+
+| Кодек | Байтів / знімок | KB/s на клієнта (down) | KB/s на клієнта (up) | Snapshot enc+dec (мкс) | Input enc+dec (мкс) |
+|---|---:|---:|---:|---:|---:|
+| JSON (валідація Zod) | [вставити з npm run bench] | [вставити] | [вставити] | [вставити] | [вставити] |
+| Binary (DataView) | [вставити з npm run bench] | [вставити] | [вставити] | [вставити] | [вставити] |
+
+*(Примітка: JSON-кодек тепер включає повну рантайм-валідацію через Zod, тому час кодування/декодування вищий порівняно з Лабораторною №05).*
+
+---
+
+## Підсилення (Pickups / Power-ups)
+
+У кімнатах із увімкненим параметром `pickupEvery` (зокрема у стартових кімнатах `alpha` та `bravo`; `0` — вимкнено) періодично з'являються три типи підсилень. Одночасно на арені може існувати не більше двох підсилень, кожне зникає через 12 с, якщо його не підібрати:
+
+| Підсилення | Літера | Ефект | Де виконується |
+|---|---|---|---|
+| `shield` | **S** (синій) | Неуразливість до пошкоджень на 6 с (180 кроків) | Лише сервер (`Ship.damage`) |
+| `rapid` | **R** (жовтий) | Зменшення затримки пострілу з 9 до 3 кроків на 8 с (240 кроків) | Спільний `stepShip` (клієнтське передбачення має знати про зміну темпу стрільби) |
+| `homing` | **H** (рожевий) | Снаряди самонаводяться на найближчу ціль протягом 8 с (240 кроків) | Лише сервер (поведінка наведення прив'язується до снаряда) |
+
+Активні ефекти відображаються у HUD (`SHIELD 4s RAPID 7s`), щит малюється як контур навколо корабля, а самонавідні снаряди мають рожевий колір.
+
+**Вплив на протокол і роль системи типів:**  
+Додавання четвертого типу сутності `"pickup"` та полів ефектів корабля (`rapid`, `shield`, `homing`) автоматично спричинило помилки компіляції в кожному `switch` за `EntityRecord` / `AnyEntity` через `assertNever`, що не дозволило забути про оновлення бінарного енкодера, декодера або рендерера. Розмір однієї сутності у бінарному кадрі зріс із 24 до 28 байтів (3 байти лічильників ефектів у кроках `1/30 с` + 1 зарезервований байт).
