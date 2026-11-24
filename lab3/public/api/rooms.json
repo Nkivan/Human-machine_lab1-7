@@ -1,0 +1,37 @@
+{
+  "rooms": [
+    {
+      "id": "alpha",
+      "name": "Alpha (calm)",
+      "players": 1,
+      "max": 4,
+      "arena": {
+        "asteroids": 4,
+        "pickupEvery": 6,
+        "seed": 1
+      }
+    },
+    {
+      "id": "bravo",
+      "name": "Bravo (rocky)",
+      "players": 2,
+      "max": 4,
+      "arena": {
+        "asteroids": 10,
+        "pickupEvery": 8,
+        "seed": 2
+      }
+    },
+    {
+      "id": "charlie",
+      "name": "Charlie (full)",
+      "players": 4,
+      "max": 4,
+      "arena": {
+        "asteroids": 8,
+        "pickupEvery": 8,
+        "seed": 3
+      }
+    }
+  ]
+}
