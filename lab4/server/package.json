@@ -1,0 +1,15 @@
+{
+  "name": "dogfight-server",
+  "private": true,
+  "version": "0.4.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file=.env src/index.js",
+    "start": "node src/index.js",
+    "test": "node --test",
+    "replay": "node tools/replay-cli.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
