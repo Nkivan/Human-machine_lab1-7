@@ -1,27 +1,27 @@
-# Dogfight - Lab 05: Мережа в реальному часі (Real-Time Networking)[cite: 1]
+# Dogfight - Lab 05: Мережа в реальному часі (Real-Time Networking)
 
 Два вікна браузера, один авторитетний сервер, 30 Hz, бінарний протокол, передбачення на клієнті (client-side prediction) з реконсиляцією (server reconciliation) та інтерполяція сутностей[cite: 1].
 
-![two players](two-players.gif)[cite: 1]
+![two players](two-players.gif)
 
 ## Запуск
 
-npm install            # встановлення всіх трьох воркспейсів (shared, client, server) + vite/eslint/prettier[cite: 1]
-npm run dev:server        # термінал 1 -> http://127.0.0.1:3000 (DEBUG_ROUTES=1 у server/.env вмикає інжектор затримок)[cite: 1]
-npm run dev:client        # термінал 2 -> http://localhost:5173 (два вікна в одній кімнаті)[cite: 1]
-npm test                  # тести: shared (кодек, детермінізм), client (prediction, інтерполяція), server (інтеграційні)[cite: 1]
-npm run bench             # порівняльна таблиця JSON vs binary[cite: 1]
-npm run hash -w shared    # перевірка хешу детермінізму (звірка з браузером: http://localhost:5173/?hash=1 -> консоль)[cite: 1]
+npm install            # встановлення всіх трьох воркспейсів (shared, client, server) + vite/eslint/prettier
+npm run dev:server        # термінал 1 -> http://127.0.0.1:3000 (DEBUG_ROUTES=1 у server/.env вмикає інжектор затримок)
+npm run dev:client        # термінал 2 -> http://localhost:5173 (два вікна в одній кімнаті)
+npm test                  # тести: shared (кодек, детермінізм), client (prediction, інтерполяція), server (інтеграційні)
+npm run bench             # порівняльна таблиця JSON vs binary
+npm run hash -w shared    # перевірка хешу детермінізму (звірка з браузером: http://localhost:5173/?hash=1 -> консоль)
 
-Керування: стрілки/WASD, Space = постріл, **L** = перемикання інжектора затримки (0 / 50 / 100 / 200 ms RTT), **[ ]** = затримка інтерполяції -/+10 ms, **N** = netgraph, H = HUD, Enter = chat[cite: 1].
-URL-прапори: `?lat=100&jitter=30&drop=0.02` (інжектор затримок зі старту), `?noise=4` (навмисне порушення детермінізму), `?hash=1`[cite: 1].
+Керування: стрілки/WASD, Space = постріл, **L** = перемикання інжектора затримки (0 / 50 / 100 / 200 ms RTT), **[ ]** = затримка інтерполяції -/+10 ms, **N** = netgraph, H = HUD, Enter = chat.
+URL-прапори: `?lat=100&jitter=30&drop=0.02` (інжектор затримок зі старту), `?noise=4` (навмисне порушення детермінізму), `?hash=1`.
 
 ## Структура проєкту
 
-- `shared/` - спільний пакет для клієнта й сервера: `sim/` (чиста детермінована симуляція з seed; `shipmove.js` - єдине правило руху), `protocol/constants.js`, `codec/` (бінарна специфікація в `binary.js`, JSON-базовий варіант, серіалізація світу в записи)[cite: 1]
-- `server/src/match.js` - один авторитетний `Match` на кімнату: тік 30 Hz за АБСОЛЮТНИМ цільовим часом; застосування черги вводів (максимум 4/тік), `world.step`, розсилка знімків із `lastProcessedSeq`; статистика тіків у `/api/stats`[cite: 1]
-- `server/src/ws.js` — бінарні та JSON-фрейми, rate limits, heartbeat, інжектор затримок (`netsim.js`)[cite: 1]
-- `client/src/net/netcode.js` — `createPredictor` (prediction, reconciliation, згладжування корекцій, локальні снаряди) та `createInterpolator`; `netgraph.js`; `game.js` об'єднує логіку клієнта[cite: 1]
+- `shared/` - спільний пакет для клієнта й сервера: `sim/` (чиста детермінована симуляція з seed; `shipmove.js` - єдине правило руху), `protocol/constants.js`, `codec/` (бінарна специфікація в `binary.js`, JSON-базовий варіант, серіалізація світу в записи)
+- `server/src/match.js` - один авторитетний `Match` на кімнату: тік 30 Hz за АБСОЛЮТНИМ цільовим часом; застосування черги вводів (максимум 4/тік), `world.step`, розсилка знімків із `lastProcessedSeq`; статистика тіків у `/api/stats`
+- `server/src/ws.js` - бінарні та JSON-фрейми, rate limits, heartbeat, інжектор затримок (`netsim.js`)
+- `client/src/net/netcode.js` — `createPredictor` (prediction, reconciliation, згладжування корекцій, локальні снаряди) та `createInterpolator`; `netgraph.js`; `game.js` об'єднує логіку клієнта
 
 ## Ключові архітектурні рішення
 
