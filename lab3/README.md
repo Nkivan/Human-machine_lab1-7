@@ -1,4 +1,4 @@
-# Dogfight — Lab 03: Async JavaScript
+# Dogfight - Lab 03: Async JavaScript
 
 Асинхронне завантаження ассетів з екраном прогресу, обробкою помилок і повторами (`withRetry`), розв'язка через `EventTarget` та лобі по HTTP з `AbortController` і `AbortSignal.timeout`.
 
