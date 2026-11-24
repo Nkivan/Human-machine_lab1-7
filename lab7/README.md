@@ -1,6 +1,5 @@
 # Dogfight — Лабораторна робота №07: рушії V8, пам'ять і тестування
 
-(https://github.com/Nkivan/Human-machine_lab1/actions/workflows/ci.yml/badge.svg)](https://github.com/Nkivan/Human-machine_lab1/actions/workflows/ci.yml)
 
 У сьомій лабораторній роботі додано набір автоматичних тестів (`Vitest` + `fast-check` + `Playwright`), типізований лінтинг і CI, серверних ботів, інструменти профілювання та виміряні оптимізації на клієнті й сервері. Симуляція залишається детермінованою (`e34f5d00`), а пошук колізій переведено на просторовий хеш (spatial hash).
 
