@@ -14,8 +14,8 @@ npm test                        # node:test - протокол, rate limit, кі
 ## Структура проєкту
 server/src/app.js - сервер на node:http: статика (MIME + захист від path traversal), GET /health, GET/POST /api/rooms, GET /api/stats, GET /api/replays[/:id], debug-маршрути
 server/src/rooms.js - Room успадковує EventEmitter (події join/leave/chat/empty), RoomManager
-server/src/protocol.js - протокол v1 + validate(); ws.js — життєвий цикл, heartbeat, rate limit, політика повільного клієнта
-server/src/log/matchlog.js - events.on(room) → Readable → NDJSON Transform → запис у файл через pipeline; replay.js — асинхронний генератор
+server/src/protocol.js - протокол v1 + validate(); ws.js - життєвий цикл, heartbeat, rate limit, політика повільного клієнта
+server/src/log/matchlog.js - events.on(room) → Readable → NDJSON Transform → запис у файл через pipeline; replay.js - асинхронний генератор
 client/src/connection.js - перепідключення з backoff та черга відправки; chatView.js, lobby.js (інтеграція з реальним API)
 
 Коди закриття: 4001 join timeout, 4002 bad JSON, 4003 bad message, 4004 not joined, 4005 already joined, 4006 no such room, 4007 room full, 4008 rate limit, 1009 payload too big, 1013 too slow
