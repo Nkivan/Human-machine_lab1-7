@@ -29,7 +29,7 @@ src/sim/behaviors.js — функції поведінок для компози
 The this bug
 What I wrote: canvas.addEventListener("click", ship.fire)
 
-What happened: при виклику через обробник події this всередині fire вказував на <canvas> (або undefined у strict mode/при відв'язаному виклику), а першим аргументом передавався об'єкт Event замість world, що призводило до TypeError.
+What happened: при виклику через обробник події this всередині fire вказував на canvas (або undefined у strict mode/при відв'язаному виклику), а першим аргументом передавався об'єкт Event замість world, що призводило до TypeError.
 
 Fix chosen: обгортка-стрілка () => ship.fire(world) при реєстрації обробника, оскільки вона не створює окреме поле на кожному екземплярі класу, явно зберігає прив'язку до ship і дозволяє чітко передати потрібний аргумент world.
 
